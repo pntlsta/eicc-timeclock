@@ -1,0 +1,395 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Time Clock</title>
+<style>
+  :root{
+    --paper:#FAFAF6; --paper-dim:#F1EFE8; --ink:#1F2328; --ink-soft:#4B5158;
+    --line:#DEDACE; --line-soft:#EAE7DD;
+    --green:#3E8E5C; --green-bg:#E6F4EA;
+    --yellow:#C98A1B; --yellow-bg:#FEF3DC;
+    --red:#B23A3A; --red-bg:#FBE7E7;
+    --radius:10px;
+    --shadow:0 1px 2px rgba(31,35,40,.06), 0 8px 24px -12px rgba(31,35,40,.15);
+    font-size:16px;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0; background:var(--paper-dim); color:var(--ink); font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif; -webkit-font-smoothing:antialiased;}
+  h1,h2,h3{font-family:Georgia,serif;}
+  .mono{font-family:'Courier New',monospace;}
+  .wrap{max-width:900px; margin:0 auto; padding:28px 20px 60px;}
+
+  .header{display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:24px; flex-wrap:wrap; gap:12px;}
+  .header h1{font-size:24px; margin:0 0 4px;}
+  .header .sub{color:var(--ink-soft); font-size:13px;}
+  .live-clock{font-size:15px; font-family:'Courier New',monospace; color:var(--ink-soft); text-align:right;}
+  .live-clock .time{font-size:20px; font-weight:700; color:var(--ink);}
+
+  .punch-panel{background:var(--paper); border:1px solid var(--line); border-radius:var(--radius); box-shadow:var(--shadow); padding:22px; margin-bottom:22px;}
+  .punch-grid{display:grid; grid-template-columns:repeat(4,1fr); gap:12px;}
+  @media (max-width:600px){.punch-grid{grid-template-columns:repeat(2,1fr);}}
+  .punch-btn{border:none; border-radius:9px; padding:18px 10px; font-size:14px; font-weight:700; cursor:pointer; color:#fff; transition:transform .1s ease, box-shadow .1s ease; text-align:center;}
+  .punch-btn:hover{transform:translateY(-1px);}
+  .punch-btn:active{transform:translateY(0);}
+  .punch-btn.in{background:var(--green);}
+  .punch-btn.lunchout, .punch-btn.lunchin{background:var(--yellow);}
+  .punch-btn.out{background:var(--red);}
+  .punch-btn.suggested{box-shadow:0 0 0 3px rgba(0,0,0,.12), 0 4px 14px rgba(0,0,0,.18);}
+  .punch-btn .label{display:block;}
+  .punch-btn .hint{display:block; font-size:10.5px; font-weight:500; opacity:.85; margin-top:3px;}
+
+  .week-panel{background:var(--paper); border:1px solid var(--line); border-radius:var(--radius); box-shadow:var(--shadow); padding:22px; margin-bottom:22px;}
+  .week-nav{display:flex; align-items:center; justify-content:space-between; margin-bottom:16px;}
+  .week-nav .label{font-weight:700; font-size:15px;}
+  .week-nav-btns{display:flex; gap:6px;}
+  .nav-btn{background:var(--paper-dim); border:1px solid var(--line); border-radius:6px; padding:6px 12px; cursor:pointer; font-size:13px; color:var(--ink);}
+  .nav-btn:hover{background:var(--line-soft);}
+
+  table.week-table{width:100%; border-collapse:collapse; font-size:13px;}
+  table.week-table th{text-align:left; padding:8px 6px; font-size:10.5px; text-transform:uppercase; letter-spacing:.05em; color:var(--ink-soft); border-bottom:2px solid var(--line);}
+  table.week-table td{padding:9px 6px; border-bottom:1px solid var(--line-soft); vertical-align:top;}
+  table.week-table tr.today td{background:var(--paper-dim);}
+  .day-name{font-weight:700;}
+  .day-date{color:var(--ink-soft); font-size:11px;}
+  .punch-cell{display:flex; flex-direction:column; gap:4px;}
+  .punch-chip{display:inline-flex; align-items:center; gap:6px; border-radius:6px; padding:3px 7px; font-size:12px; font-weight:600; width:fit-content;}
+  .punch-chip.in{background:var(--green-bg); color:var(--green);}
+  .punch-chip.lunchout, .punch-chip.lunchin{background:var(--yellow-bg); color:var(--yellow);}
+  .punch-chip.out{background:var(--red-bg); color:var(--red);}
+  .punch-chip button{background:none; border:none; cursor:pointer; padding:0; font-size:11px; opacity:.6; color:inherit;}
+  .punch-chip button:hover{opacity:1;}
+  .empty-cell{color:#B9B3A2; font-style:italic; font-size:12px;}
+  .hours-cell{font-weight:700; font-family:'Courier New',monospace;}
+  .week-total-row td{font-weight:700; border-top:2px solid var(--line); padding-top:10px;}
+
+  .save-bar{display:flex; gap:10px; align-items:center;}
+  .save-btn{flex:1; background:var(--green); color:#fff; border:none; border-radius:8px; padding:12px; font-weight:700; cursor:pointer; font-size:14px;}
+  .save-btn:disabled{background:var(--line); color:var(--ink-soft); cursor:default;}
+  .print-btn{background:var(--paper-dim); border:1px solid var(--line); border-radius:8px; padding:12px 16px; cursor:pointer; font-size:14px; color:var(--ink); font-weight:600;}
+  .print-btn:hover{background:var(--line-soft);}
+  .save-count{background:rgba(255,255,255,.3); border-radius:100px; padding:1px 8px; font-size:12px; margin-left:6px;}
+
+  /* edit modal */
+  .overlay{position:fixed; inset:0; background:rgba(31,35,40,.45); display:none; align-items:center; justify-content:center; padding:20px; z-index:50;}
+  .overlay.show{display:flex;}
+  .modal{background:var(--paper); border-radius:12px; max-width:340px; width:100%; box-shadow:0 20px 50px -12px rgba(0,0,0,.35); padding:22px;}
+  .modal h3{margin:0 0 14px; font-size:16px;}
+  .modal label{font-size:12px; font-weight:600; color:var(--ink-soft); display:block; margin-bottom:5px;}
+  .modal input{width:100%; padding:8px 10px; border:1px solid var(--line); border-radius:6px; font-size:14px; margin-bottom:14px;}
+  .modal-btns{display:flex; gap:8px;}
+  .modal-btns button{flex:1; padding:10px; border-radius:7px; border:none; cursor:pointer; font-weight:600; font-size:13px;}
+  .modal-save{background:var(--ink); color:var(--paper);}
+  .modal-cancel{background:var(--paper-dim); color:var(--ink); border:1px solid var(--line) !important;}
+
+  /* print styles */
+  @media print{
+    body{background:#fff;}
+    .header .live-clock, .punch-panel, .week-nav-btns, .save-bar, .overlay{display:none !important;}
+    .wrap{max-width:100%; padding:0;}
+    .week-panel{box-shadow:none; border:none; padding:0;}
+    .punch-chip button{display:none;}
+    .punch-chip{background:none !important; color:#000 !important; padding:0;}
+    table.week-table th, table.week-table td{border-color:#000;}
+  }
+</style>
+</head>
+<body>
+
+<div class="wrap">
+  <div class="header">
+    <div>
+      <h1>Time Clock</h1>
+      <div class="sub" id="dateToday"></div>
+    </div>
+    <div class="live-clock">
+      <div class="time" id="liveTime"></div>
+      <div>Local time</div>
+    </div>
+  </div>
+
+  <div class="punch-panel">
+    <div class="punch-grid">
+      <button class="punch-btn in" id="btnIn"><span class="label">Clock In</span><span class="hint" id="hintIn"></span></button>
+      <button class="punch-btn lunchout" id="btnLunchOut"><span class="label">Lunch Out</span><span class="hint" id="hintLunchOut"></span></button>
+      <button class="punch-btn lunchin" id="btnLunchIn"><span class="label">Lunch In</span><span class="hint" id="hintLunchIn"></span></button>
+      <button class="punch-btn out" id="btnOut"><span class="label">Clock Out</span><span class="hint" id="hintOut"></span></button>
+    </div>
+  </div>
+
+  <div class="week-panel">
+    <div class="week-nav">
+      <div class="label" id="weekLabel"></div>
+      <div class="week-nav-btns">
+        <button class="nav-btn" id="prevWeek">&#8249; Prev</button>
+        <button class="nav-btn" id="thisWeekBtn">This Week</button>
+        <button class="nav-btn" id="nextWeek">Next &#8250;</button>
+      </div>
+    </div>
+    <table class="week-table">
+      <thead>
+        <tr><th>Day</th><th>Clock In</th><th>Lunch Out</th><th>Lunch In</th><th>Clock Out</th><th>Hours</th></tr>
+      </thead>
+      <tbody id="weekBody"></tbody>
+      <tfoot>
+        <tr class="week-total-row"><td colspan="5">Weekly Total</td><td class="hours-cell" id="weekTotal">0.00</td></tr>
+      </tfoot>
+    </table>
+  </div>
+
+  <div class="save-bar">
+    <button class="save-btn" id="saveBtn" disabled>Save <span class="save-count" id="saveCount">0</span></button>
+    <button class="print-btn" id="printBtn">Print Week (Ctrl+P)</button>
+  </div>
+</div>
+
+<div class="overlay" id="editOverlay">
+  <div class="modal">
+    <h3>Edit Punch</h3>
+    <label>Date</label>
+    <input type="date" id="editDate">
+    <label>Time</label>
+    <input type="time" id="editTime">
+    <div class="modal-btns">
+      <button class="modal-cancel" id="editCancel">Cancel</button>
+      <button class="modal-save" id="editSave">Save</button>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ============ CONFIG ============ */
+const GITHUB_REPO = "pntlsta/timeclock"; // EDIT THIS to your actual repo
+const DATA_URL = "data/punches.json";
+
+/* ============ STATE ============ */
+let state = { punches: [], pending: [] };
+let weekOffset = 0; // 0 = this week, -1 = last week, etc.
+let editingId = null;
+
+const TYPE_LABELS = { in:'Clock In', lunchout:'Lunch Out', lunchin:'Lunch In', out:'Clock Out' };
+
+/* ============ DATE HELPERS (week starts SUNDAY) ============ */
+function pad(n){ return String(n).padStart(2,'0'); }
+function isoDate(d){ return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`; }
+function todayISO(){ return isoDate(new Date()); }
+function weekStart(offset){
+  const d = new Date();
+  d.setHours(0,0,0,0);
+  d.setDate(d.getDate() - d.getDay() + offset*7); // back up to Sunday
+  return d;
+}
+function fmtTime12(t){
+  if(!t) return '';
+  let [h,m] = t.split(':').map(Number);
+  const ampm = h >= 12 ? 'PM' : 'AM';
+  h = h % 12; if(h === 0) h = 12;
+  return `${h}:${pad(m)} ${ampm}`;
+}
+function minutesOf(t){
+  const [h,m] = t.split(':').map(Number);
+  return h*60 + m;
+}
+
+/* ============ LOAD DATA ============ */
+async function loadData(){
+  const bust = '?t=' + Date.now();
+  try{
+    const res = await fetch(DATA_URL + bust).then(r=>r.json());
+    state.punches = res.punches || [];
+  }catch(err){
+    console.error(err);
+  }
+  const savedPunches = localStorage.getItem('tc_local_punches');
+  if(savedPunches){
+    try{
+      const local = JSON.parse(savedPunches);
+      // merge: local punches not yet confirmed in fetched data get kept
+      const existingIds = new Set(state.punches.map(p=>p.id));
+      local.forEach(p => { if(!existingIds.has(p.id)) state.punches.push(p); });
+    }catch(e){}
+  }
+  const savedPending = localStorage.getItem('tc_pending');
+  if(savedPending){ try{ state.pending = JSON.parse(savedPending); }catch(e){} }
+  renderAll();
+}
+function persistLocal(){
+  localStorage.setItem('tc_local_punches', JSON.stringify(state.punches));
+  localStorage.setItem('tc_pending', JSON.stringify(state.pending));
+}
+
+/* ============ PUNCH ACTIONS ============ */
+function nextLocalId(){
+  const nums = state.punches.map(p => { const m = String(p.id).match(/^p(\d+)$/); return m ? parseInt(m[1],10) : 0; });
+  const max = nums.length ? Math.max(...nums) : 0;
+  return `p${max+1}`;
+}
+function doPunch(type){
+  const now = new Date();
+  const date = isoDate(now);
+  const time = `${pad(now.getHours())}:${pad(now.getMinutes())}`;
+  const id = nextLocalId();
+  state.punches.push({ id, type, date, time });
+  state.pending.push(`punch add ${type} ${date} ${time}`);
+  persistLocal();
+  renderAll();
+}
+document.getElementById('btnIn').addEventListener('click', ()=> doPunch('in'));
+document.getElementById('btnLunchOut').addEventListener('click', ()=> doPunch('lunchout'));
+document.getElementById('btnLunchIn').addEventListener('click', ()=> doPunch('lunchin'));
+document.getElementById('btnOut').addEventListener('click', ()=> doPunch('out'));
+
+function deletePunch(id){
+  const p = state.punches.find(x=>x.id===id);
+  if(!p) return;
+  if(!confirm(`Delete this ${TYPE_LABELS[p.type]} punch (${fmtTime12(p.time)} on ${p.date})?`)) return;
+  state.punches = state.punches.filter(x=>x.id!==id);
+  state.pending.push(`punch delete ${id}`);
+  persistLocal();
+  renderAll();
+}
+
+function openEdit(id){
+  const p = state.punches.find(x=>x.id===id);
+  if(!p) return;
+  editingId = id;
+  document.getElementById('editDate').value = p.date;
+  document.getElementById('editTime').value = p.time;
+  document.getElementById('editOverlay').classList.add('show');
+}
+document.getElementById('editCancel').addEventListener('click', ()=>{
+  document.getElementById('editOverlay').classList.remove('show');
+});
+document.getElementById('editSave').addEventListener('click', ()=>{
+  const p = state.punches.find(x=>x.id===editingId);
+  if(!p) return;
+  const date = document.getElementById('editDate').value;
+  const time = document.getElementById('editTime').value;
+  if(!date || !time) return;
+  p.date = date; p.time = time;
+  state.pending.push(`punch edit ${editingId} ${date} ${time}`);
+  persistLocal();
+  document.getElementById('editOverlay').classList.remove('show');
+  renderAll();
+});
+
+/* ============ SUGGESTED NEXT PUNCH ============ */
+function updateSuggestion(){
+  const today = todayISO();
+  const todays = state.punches.filter(p=>p.date===today);
+  const has = t => todays.some(p=>p.type===t);
+  document.querySelectorAll('.punch-btn').forEach(b=>b.classList.remove('suggested'));
+  let next = 'in';
+  if(has('in') && !has('lunchout') && !has('out')) next = 'lunchout';
+  else if(has('lunchout') && !has('lunchin')) next = 'lunchin';
+  else if((has('lunchin') || (has('in') && !has('lunchout'))) && !has('out')) next = 'out';
+  else if(has('in') && has('out')) next = null;
+  const map = { in:'btnIn', lunchout:'btnLunchOut', lunchin:'btnLunchIn', out:'btnOut' };
+  if(next) document.getElementById(map[next]).classList.add('suggested');
+
+  document.getElementById('hintIn').textContent = has('in') ? `Logged ${fmtTime12(todays.find(p=>p.type==='in').time)}` : '';
+  document.getElementById('hintLunchOut').textContent = has('lunchout') ? `Logged ${fmtTime12(todays.find(p=>p.type==='lunchout').time)}` : '';
+  document.getElementById('hintLunchIn').textContent = has('lunchin') ? `Logged ${fmtTime12(todays.find(p=>p.type==='lunchin').time)}` : '';
+  document.getElementById('hintOut').textContent = has('out') ? `Logged ${fmtTime12(todays.find(p=>p.type==='out').time)}` : '';
+}
+
+/* ============ WEEK VIEW ============ */
+function computeDayHours(dayPunches){
+  const byType = {};
+  dayPunches.forEach(p => byType[p.type] = p.time);
+  if(!byType.in || !byType.out) return null;
+  let total = minutesOf(byType.out) - minutesOf(byType.in);
+  if(byType.lunchout && byType.lunchin){
+    total -= (minutesOf(byType.lunchin) - minutesOf(byType.lunchout));
+  }
+  return Math.max(0, total) / 60;
+}
+
+function renderWeek(){
+  const start = weekStart(weekOffset);
+  const end = new Date(start); end.setDate(end.getDate()+6);
+  const label = weekOffset === 0 ? 'This Week' : `${start.toLocaleDateString('en-US',{month:'short',day:'numeric'})} \u2013 ${end.toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'})}`;
+  document.getElementById('weekLabel').textContent = label + (weekOffset===0 ? '' : ` (${start.toLocaleDateString('en-US',{month:'short',day:'numeric'})} \u2013 ${end.toLocaleDateString('en-US',{month:'short',day:'numeric'})})`);
+
+  const body = document.getElementById('weekBody');
+  body.innerHTML = '';
+  let weekTotal = 0;
+  const today = todayISO();
+
+  for(let i=0;i<7;i++){
+    const d = new Date(start); d.setDate(d.getDate()+i);
+    const dISO = isoDate(d);
+    const dayPunches = state.punches.filter(p=>p.date===dISO);
+    const hours = computeDayHours(dayPunches);
+    if(hours) weekTotal += hours;
+
+    const tr = document.createElement('tr');
+    if(dISO === today) tr.className = 'today';
+
+    const dayCell = `<td><div class="day-name">${d.toLocaleDateString('en-US',{weekday:'short'})}</div><div class="day-date">${d.toLocaleDateString('en-US',{month:'short',day:'numeric'})}</div></td>`;
+
+    const cellFor = (type) => {
+      const p = dayPunches.find(x=>x.type===type);
+      if(!p) return `<td><span class="empty-cell">&mdash;</span></td>`;
+      return `<td><div class="punch-cell"><span class="punch-chip ${type}">${fmtTime12(p.time)}
+        <button onclick="openEdit('${p.id}')" title="Edit">&#9998;</button>
+        <button onclick="deletePunch('${p.id}')" title="Delete">&times;</button>
+      </span></div></td>`;
+    };
+
+    const hoursCell = `<td class="hours-cell">${hours!=null ? hours.toFixed(2) : '&mdash;'}</td>`;
+
+    tr.innerHTML = dayCell + cellFor('in') + cellFor('lunchout') + cellFor('lunchin') + cellFor('out') + hoursCell;
+    body.appendChild(tr);
+  }
+  document.getElementById('weekTotal').textContent = weekTotal.toFixed(2);
+}
+
+document.getElementById('prevWeek').addEventListener('click', ()=>{ weekOffset--; renderWeek(); });
+document.getElementById('nextWeek').addEventListener('click', ()=>{ weekOffset++; renderWeek(); });
+document.getElementById('thisWeekBtn').addEventListener('click', ()=>{ weekOffset=0; renderWeek(); });
+
+/* ============ LIVE CLOCK ============ */
+function tickClock(){
+  const now = new Date();
+  document.getElementById('liveTime').textContent = now.toLocaleTimeString('en-US');
+  document.getElementById('dateToday').textContent = now.toLocaleDateString('en-US', { weekday:'long', month:'long', day:'numeric', year:'numeric' });
+}
+setInterval(tickClock, 1000);
+
+/* ============ PRINT ============ */
+document.getElementById('printBtn').addEventListener('click', ()=> window.print());
+// Ctrl+P is handled natively by the browser; the @media print CSS above
+// takes care of hiding buttons and cleaning up the layout automatically.
+
+/* ============ SAVE (GitHub Issue) ============ */
+function renderSaveBar(){
+  const btn = document.getElementById('saveBtn');
+  document.getElementById('saveCount').textContent = state.pending.length;
+  btn.disabled = state.pending.length === 0;
+}
+document.getElementById('saveBtn').addEventListener('click', ()=>{
+  if(state.pending.length === 0) return;
+  const title = encodeURIComponent('Timeclock update - ' + new Date().toLocaleString());
+  const body = encodeURIComponent(state.pending.join('\n'));
+  const url = `https://github.com/${GITHUB_REPO}/issues/new?title=${title}&body=${body}`;
+  window.open(url, '_blank');
+  state.pending = [];
+  persistLocal();
+  renderSaveBar();
+});
+
+/* ============ RENDER ALL ============ */
+function renderAll(){
+  updateSuggestion();
+  renderWeek();
+  renderSaveBar();
+}
+
+/* ============ INIT ============ */
+tickClock();
+loadData();
+</script>
+</body>
+</html>
