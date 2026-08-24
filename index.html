@@ -15,6 +15,13 @@
     --shadow:0 1px 2px rgba(31,35,40,.06), 0 8px 24px -12px rgba(31,35,40,.15);
     font-size:16px;
   }
+  body.dark{
+    --paper:#1E2023; --paper-dim:#17181B; --ink:#ECEDE9; --ink-soft:#9BA1A7;
+    --line:#33363B; --line-soft:#2A2C30;
+    --green-bg:rgba(62,142,92,.22); --yellow-bg:rgba(201,138,27,.22); --red-bg:rgba(178,58,58,.22);
+    --shadow:0 1px 2px rgba(0,0,0,.3), 0 8px 24px -12px rgba(0,0,0,.5);
+  }
+  body{ transition:background .15s ease, color .15s ease; }
   *{box-sizing:border-box;}
   body{margin:0; background:var(--paper-dim); color:var(--ink); font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif; -webkit-font-smoothing:antialiased;}
   h1,h2,h3{font-family:Georgia,serif;}
@@ -26,6 +33,8 @@
   .header .sub{color:var(--ink-soft); font-size:13px;}
   .live-clock{font-size:15px; font-family:'Courier New',monospace; color:var(--ink-soft); text-align:right;}
   .live-clock .time{font-size:20px; font-weight:700; color:var(--ink);}
+  .theme-toggle{background:var(--paper-dim); border:1px solid var(--line); border-radius:7px; padding:6px 12px; cursor:pointer; font-size:12px; color:var(--ink); margin-top:8px;}
+  .theme-toggle:hover{background:var(--line-soft);}
 
   .punch-panel{background:var(--paper); border:1px solid var(--line); border-radius:var(--radius); box-shadow:var(--shadow); padding:22px; margin-bottom:22px;}
   .punch-grid{display:grid; grid-template-columns:repeat(4,1fr); gap:12px;}
@@ -60,7 +69,16 @@
   .punch-chip.out{background:var(--red-bg); color:var(--red);}
   .punch-chip button{background:none; border:none; cursor:pointer; padding:0; font-size:11px; opacity:.6; color:inherit;}
   .punch-chip button:hover{opacity:1;}
-  .empty-cell{color:#B9B3A2; font-style:italic; font-size:12px;}
+  .empty-cell{color:#B9B3A2; font-style:italic; font-size:12px; cursor:pointer; padding:4px 6px; border-radius:5px; display:inline-block;}
+  .empty-cell:hover{background:var(--paper-dim); color:var(--ink-soft);}
+  .punch-chip .chip-time{cursor:pointer;}
+  .punch-chip .chip-time:hover{text-decoration:underline;}
+  .cell-input-wrap{display:flex; flex-direction:column; gap:2px;}
+  .cell-input{width:78px; padding:4px 6px; border:1px solid var(--ink); border-radius:5px; font-size:12.5px; background:var(--paper); color:var(--ink);}
+  .cell-input.invalid{border-color:var(--red);}
+  .cell-preview{font-size:10px; color:var(--ink-soft); line-height:1.3;}
+  .cell-preview.valid{color:var(--green);}
+  .cell-preview.invalid{color:var(--red);}
   .hours-cell{font-weight:700; font-family:'Courier New',monospace;}
   .week-total-row td{font-weight:700; border-top:2px solid var(--line); padding-top:10px;}
 
@@ -77,7 +95,10 @@
   .modal{background:var(--paper); border-radius:12px; max-width:340px; width:100%; box-shadow:0 20px 50px -12px rgba(0,0,0,.35); padding:22px;}
   .modal h3{margin:0 0 14px; font-size:16px;}
   .modal label{font-size:12px; font-weight:600; color:var(--ink-soft); display:block; margin-bottom:5px;}
-  .modal input{width:100%; padding:8px 10px; border:1px solid var(--line); border-radius:6px; font-size:14px; margin-bottom:14px;}
+  .modal input{width:100%; padding:8px 10px; border:1px solid var(--line); border-radius:6px; font-size:14px; margin-bottom:6px; background:var(--paper); color:var(--ink);}
+  .time-preview{font-size:12px; margin:0 0 14px; min-height:16px; color:var(--ink-soft);}
+  .time-preview.valid{color:var(--green); font-weight:600;}
+  .time-preview.invalid{color:var(--red); font-weight:600;}
   .modal-btns{display:flex; gap:8px;}
   .modal-btns button{flex:1; padding:10px; border-radius:7px; border:none; cursor:pointer; font-weight:600; font-size:13px;}
   .modal-save{background:var(--ink); color:var(--paper);}
@@ -85,13 +106,13 @@
 
   /* print styles */
   @media print{
-    body{background:#fff;}
-    .header .live-clock, .punch-panel, .week-nav-btns, .save-bar, .overlay{display:none !important;}
+    body, body.dark{background:#fff !important; color:#000 !important;}
+    .header .live-clock, .punch-panel, .week-nav-btns, .save-bar, .overlay, .theme-toggle{display:none !important;}
     .wrap{max-width:100%; padding:0;}
-    .week-panel{box-shadow:none; border:none; padding:0;}
+    .week-panel{box-shadow:none; border:none; padding:0; background:#fff !important;}
     .punch-chip button{display:none;}
     .punch-chip{background:none !important; color:#000 !important; padding:0;}
-    table.week-table th, table.week-table td{border-color:#000;}
+    table.week-table th, table.week-table td{border-color:#000; color:#000 !important;}
   }
 </style>
 </head>
@@ -106,6 +127,7 @@
     <div class="live-clock">
       <div class="time" id="liveTime"></div>
       <div>Local time</div>
+      <button class="theme-toggle" id="themeToggle">&#9728; Light mode</button>
     </div>
   </div>
 
@@ -144,23 +166,9 @@
   </div>
 </div>
 
-<div class="overlay" id="editOverlay">
-  <div class="modal">
-    <h3>Edit Punch</h3>
-    <label>Date</label>
-    <input type="date" id="editDate">
-    <label>Time</label>
-    <input type="time" id="editTime">
-    <div class="modal-btns">
-      <button class="modal-cancel" id="editCancel">Cancel</button>
-      <button class="modal-save" id="editSave">Save</button>
-    </div>
-  </div>
-</div>
-
 <script>
 /* ============ CONFIG ============ */
-const GITHUB_REPO = "pntlsta/eicc-timeclock"; // EDIT THIS to your actual repo
+const GITHUB_REPO = "pntlsta/timeclock"; // EDIT THIS to your actual repo
 const DATA_URL = "data/punches.json";
 
 /* ============ STATE ============ */
@@ -190,6 +198,54 @@ function fmtTime12(t){
 function minutesOf(t){
   const [h,m] = t.split(':').map(Number);
   return h*60 + m;
+}
+
+/* ============ UKG-STYLE SHORTHAND TIME PARSER ============
+   "8"    -> 8:00 AM      "20"    -> 8:00 PM
+   "830"  -> 8:30 AM      "2030"  -> 8:30 PM
+   "8p"/"8pm"  -> 8:00 PM (explicit override)
+   "12"   -> 12:00 PM (noon)   "12am" -> 12:00 AM (midnight)
+   "8:30" or "8:30 PM" also accepted directly.
+   Returns "HH:MM" (24hr) or null if unparseable. */
+function parseShorthandTime(raw){
+  if(!raw) return null;
+  let s = raw.trim().toLowerCase().replace(/\s+/g,'');
+  if(!s) return null;
+
+  let meridiem = null;
+  if(s.endsWith('am')){ meridiem='am'; s=s.slice(0,-2); }
+  else if(s.endsWith('pm')){ meridiem='pm'; s=s.slice(0,-2); }
+  else if(/[ap]$/.test(s)){ meridiem = s.endsWith('a') ? 'am' : 'pm'; s=s.slice(0,-1); }
+
+  let rawHour, rawMinute;
+  if(s.includes(':')){
+    const parts = s.split(':');
+    rawHour = parseInt(parts[0],10);
+    rawMinute = parseInt(parts[1],10);
+    if(isNaN(rawMinute)) rawMinute = 0;
+  } else {
+    const digits = s.replace(/\D/g,'');
+    if(!digits) return null;
+    if(digits.length <= 2){ rawHour = parseInt(digits,10); rawMinute = 0; }
+    else if(digits.length === 3){ rawHour = parseInt(digits.slice(0,1),10); rawMinute = parseInt(digits.slice(1),10); }
+    else { rawHour = parseInt(digits.slice(0,2),10); rawMinute = parseInt(digits.slice(2,4),10); }
+  }
+
+  if(isNaN(rawHour) || isNaN(rawMinute) || rawMinute > 59 || rawMinute < 0) return null;
+
+  let hour24;
+  if(meridiem){
+    const h12 = rawHour % 12;
+    hour24 = (meridiem === 'am') ? h12 : h12 + 12;
+  } else {
+    if(rawHour === 0) hour24 = 0;                          // "0" -> 12:00 AM
+    else if(rawHour >= 1 && rawHour <= 11) hour24 = rawHour; // default AM
+    else if(rawHour === 12) hour24 = 12;                     // default noon
+    else if(rawHour >= 13 && rawHour <= 23) hour24 = rawHour; // literal 24hr -> PM
+    else return null;
+  }
+  if(hour24 < 0 || hour24 > 23) return null;
+  return `${pad(hour24)}:${pad(rawMinute)}`;
 }
 
 /* ============ LOAD DATA ============ */
@@ -250,29 +306,59 @@ function deletePunch(id){
   renderAll();
 }
 
-function openEdit(id){
-  const p = state.punches.find(x=>x.id===id);
-  if(!p) return;
-  editingId = id;
-  document.getElementById('editDate').value = p.date;
-  document.getElementById('editTime').value = p.time;
-  document.getElementById('editOverlay').classList.add('show');
-}
-document.getElementById('editCancel').addEventListener('click', ()=>{
-  document.getElementById('editOverlay').classList.remove('show');
-});
-document.getElementById('editSave').addEventListener('click', ()=>{
-  const p = state.punches.find(x=>x.id===editingId);
-  if(!p) return;
-  const date = document.getElementById('editDate').value;
-  const time = document.getElementById('editTime').value;
-  if(!date || !time) return;
-  p.date = date; p.time = time;
-  state.pending.push(`punch edit ${editingId} ${date} ${time}`);
+/* ============ INLINE CELL EDITING ============ */
+let editingCell = null; // { date, type } or null
+
+function commitCell(date, type){
+  const input = document.getElementById(`cellinput-${date}-${type}`);
+  if(!input) return;
+  const raw = input.value.trim();
+  const existing = state.punches.find(p=>p.date===date && p.type===type);
+
+  if(!raw){
+    if(existing){
+      state.punches = state.punches.filter(p=>p!==existing);
+      state.pending.push(`punch delete ${existing.id}`);
+      persistLocal();
+    }
+    editingCell = null;
+    renderAll();
+    return;
+  }
+
+  const parsed = parseShorthandTime(raw);
+  if(!parsed){
+    input.classList.add('invalid');
+    const preview = document.getElementById(`cellpreview-${date}-${type}`);
+    if(preview){ preview.textContent = "Can't read that"; preview.className = 'cell-preview invalid'; }
+    return; // stay in edit mode, don't close
+  }
+
+  if(existing){
+    existing.time = parsed;
+    state.pending.push(`punch edit ${existing.id} ${date} ${parsed}`);
+  } else {
+    const id = nextLocalId();
+    state.punches.push({ id, type, date, time: parsed });
+    state.pending.push(`punch add ${type} ${date} ${parsed}`);
+  }
   persistLocal();
-  document.getElementById('editOverlay').classList.remove('show');
+  editingCell = null;
   renderAll();
-});
+}
+
+function cancelCellEdit(){
+  editingCell = null;
+  renderWeek();
+}
+
+function startCellEdit(date, type){
+  editingCell = { date, type };
+  renderWeek();
+}
+window.startCellEdit = startCellEdit;
+window.commitCell = commitCell;
+window.cancelCellEdit = cancelCellEdit;
 
 /* ============ SUGGESTED NEXT PUNCH ============ */
 function updateSuggestion(){
@@ -331,9 +417,22 @@ function renderWeek(){
 
     const cellFor = (type) => {
       const p = dayPunches.find(x=>x.type===type);
-      if(!p) return `<td><span class="empty-cell">&mdash;</span></td>`;
-      return `<td><div class="punch-cell"><span class="punch-chip ${type}">${fmtTime12(p.time)}
-        <button onclick="openEdit('${p.id}')" title="Edit">&#9998;</button>
+      const isEditing = editingCell && editingCell.date === dISO && editingCell.type === type;
+
+      if(isEditing){
+        const prefill = p ? fmtTime12(p.time) : '';
+        return `<td>
+          <div class="cell-input-wrap">
+            <input type="text" class="cell-input" id="cellinput-${dISO}-${type}" value="${prefill}" placeholder="e.g. 830">
+            <div class="cell-preview" id="cellpreview-${dISO}-${type}"></div>
+          </div>
+        </td>`;
+      }
+      if(!p){
+        return `<td><span class="empty-cell" onclick="startCellEdit('${dISO}','${type}')">&mdash;</span></td>`;
+      }
+      return `<td><div class="punch-cell"><span class="punch-chip ${type}">
+        <span class="chip-time" onclick="startCellEdit('${dISO}','${type}')">${fmtTime12(p.time)}</span>
         <button onclick="deletePunch('${p.id}')" title="Delete">&times;</button>
       </span></div></td>`;
     };
@@ -344,6 +443,44 @@ function renderWeek(){
     body.appendChild(tr);
   }
   document.getElementById('weekTotal').textContent = weekTotal.toFixed(2);
+
+  if(editingCell){
+    attachCellInputHandlers(editingCell.date, editingCell.type);
+  }
+}
+
+function attachCellInputHandlers(date, type){
+  const input = document.getElementById(`cellinput-${date}-${type}`);
+  if(!input) return;
+  input.focus();
+  input.select();
+
+  input.addEventListener('input', ()=>{
+    input.classList.remove('invalid');
+    const preview = document.getElementById(`cellpreview-${date}-${type}`);
+    const raw = input.value.trim();
+    if(!raw){ preview.textContent=''; preview.className='cell-preview'; return; }
+    const parsed = parseShorthandTime(raw);
+    if(parsed){ preview.textContent = fmtTime12(parsed); preview.className='cell-preview valid'; }
+    else { preview.textContent = "Can't read that"; preview.className='cell-preview invalid'; }
+  });
+
+  input.addEventListener('keydown', (e)=>{
+    if(e.key === 'Enter'){ commitCell(date, type); }
+    else if(e.key === 'Escape'){ cancelCellEdit(); }
+  });
+
+  // Closure-captured date/type, not the mutable editingCell, so clicking
+  // straight from one open cell into another can't misfire against the
+  // wrong cell. If a different cell has since taken over editing, this
+  // blur is a no-op rather than committing stale/mismatched data.
+  input.addEventListener('blur', ()=>{
+    setTimeout(()=>{
+      if(editingCell && editingCell.date === date && editingCell.type === type){
+        commitCell(date, type);
+      }
+    }, 120);
+  });
 }
 
 document.getElementById('prevWeek').addEventListener('click', ()=>{ weekOffset--; renderWeek(); });
@@ -387,7 +524,21 @@ function renderAll(){
   renderSaveBar();
 }
 
+/* ============ THEME (defaults to dark) ============ */
+function applyTheme(){
+  const saved = localStorage.getItem('tc_theme');
+  const dark = saved === null ? true : saved === 'dark'; // default: dark
+  document.body.classList.toggle('dark', dark);
+  document.getElementById('themeToggle').innerHTML = dark ? '&#9728; Light mode' : '&#9789; Dark mode';
+}
+document.getElementById('themeToggle').addEventListener('click', ()=>{
+  const isDark = document.body.classList.contains('dark');
+  localStorage.setItem('tc_theme', isDark ? 'light' : 'dark');
+  applyTheme();
+});
+
 /* ============ INIT ============ */
+applyTheme();
 tickClock();
 loadData();
 </script>
